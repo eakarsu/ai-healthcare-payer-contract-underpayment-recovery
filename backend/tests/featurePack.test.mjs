@@ -1,0 +1,8 @@
+import test from "node:test"; import assert from "node:assert/strict";
+delete process.env.OPENROUTER_API_KEY; delete process.env.OPENAI_API_KEY;
+const { filterRecords, toCSV, deterministicInsights } = await import("../featurePack.mjs");
+const rows=[{id:1,title:"Alpha",status:"Open",risk:"High",amount:0,flag:false,note:""},{id:2,title:"Beta",status:"Closed",risk:"Low",amount:50,flag:true,note:"x"}];
+test("search/filter on main list",()=>{ assert.equal(filterRecords(rows,{q:"alpha"}).length,1); assert.equal(filterRecords(rows,{status:"Open"}).length,1); assert.equal(filterRecords(rows,{risk:"Low"})[0].id,2); });
+test("CSV/JSON export preserves false/0/empty",()=>{ const csv=toCSV(rows); assert.ok(csv.includes("false")); assert.ok(csv.split("\n")[1].includes(",0,")); assert.equal(JSON.parse(JSON.stringify(rows))[0].amount,0); });
+test("deterministic insights labelled aiGenerated:false over own records, no provider call",()=>{ const ins=deterministicInsights(rows, ["A","B","C"]); assert.equal(ins.length,3); assert.ok(ins.every(x=>x.aiGenerated===false && x.label.includes("Deterministic fallback"))); assert.ok(ins[0].metrics.some(m=>m.label==="Zero-amount records" && m.value===1)); assert.ok(deterministicInsights([])[0].metrics.some(m=>m.value===0)); assert.equal(deterministicInsights([]).length,3); });
+test("feature pack UI and routes are wired", async ()=>{ const fs=await import("node:fs"); const srv=fs.readFileSync(new URL("../server.mjs",import.meta.url),"utf8"); assert.ok(srv.includes("mountFeaturePack")); const ui=fs.readFileSync(new URL("../../frontend/src/FeaturePack.jsx",import.meta.url),"utf8"); assert.ok(ui.includes("Staff tasks") && ui.includes("Export CSV") && ui.includes("aiGenerated")); });
